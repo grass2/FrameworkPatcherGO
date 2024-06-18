@@ -1,6 +1,9 @@
 name: Zip & Upload Release
 
-
+on:
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   release:
