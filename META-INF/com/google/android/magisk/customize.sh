@@ -120,7 +120,11 @@ i_method="public whitelist.*newApplication"
 ui_print "File found: $instrumentation_file"
 
 if (! grep -wlq "$instrumentation_file" -e "$i_static_method") && (! grep -wlq "$instrumentation_file" -e "$i_method"); then
-    abort "newApplication method not in Instrumentation.smali"
+    i_static_method="public static newApplication"
+    i_method="public newApplication"
+    if (! grep -wlq "$instrumentation_file" -e "$i_static_method") && (! grep -wlq "$instrumentation_file" -e "$i_method"); then
+        abort "newApplication method not in Instrumentation.smali"
+    fi
 fi
 
 ui_print " "
@@ -186,7 +190,7 @@ ui_print "> Patching ApplicationPackageManager.smali file ..."
 ui_print "******************************"
 app_package_manager_file="$(find "$TMP/framework" -type f -name "ApplicationPackageManager.smali")"
 app_package_manager_dex="$(classes_path_to_dex "$app_package_manager_file")"
-apm_method="public whitelist.*hasSystemFeature(Ljava/lang/String;)Z"
+apm_method="public .*hasSystemFeature(Ljava/lang/String;)Z"
 ui_print "File found: $app_package_manager_file"
 
 if (! grep -wlq "$app_package_manager_file" -e "$apm_method"); then
@@ -315,17 +319,28 @@ if [ "$to_recompile" = "true" ]; then
     zipalign -f -p -z 4 "$TMP/framework-patched.zip" "$mod_framework"
     if [ -e "$mod_framework" ]; then
         ui_print "Cleaning boot-framework files ..."
-        if [ "$BOOTMODE" ] && { [ "$KSU" ] || [ "$APATCH" ]; }; then
-            find "/system/framework" -type f -name 'boot-framework.*' -print0 |
-                while IFS= read -r -d '' line; do
-                    mkdir -p "$(dirname "$MODPATH$line")" && mknod "$MODPATH$line" c 0 0
-                done
-        elif [ "$BOOTMODE" ] && [ "$MAGISK_VER_CODE" ]; then
-            find "/system/framework" -type f -name 'boot-framework.*' -print0 |
-                while IFS= read -r -d '' line; do
-                    mkdir -p "$(dirname "$MODPATH$line")" && touch "$MODPATH$line"
-                done
+        ui_print " "
+        ui_print "This step is not required unless your device crashes after installing this module."
+        ui_print "Do you want to apply this step?"
+        ui_print "- YES  [Press volume UP]"
+        ui_print "- NO   [Press volume DOWN]"
+        ui_print " "
+        if $yes; then
+            if [ "$BOOTMODE" ] && { [ "$KSU" ] || [ "$APATCH" ]; }; then
+                find "/system/framework" -type f -name 'boot-framework.*' -print0 |
+                    while IFS= read -r -d '' line; do
+                        mkdir -p "$(dirname "$MODPATH$line")" && mknod "$MODPATH$line" c 0 0
+                    done
+            elif [ "$BOOTMODE" ] && [ "$MAGISK_VER_CODE" ]; then
+                find "/system/framework" -type f -name 'boot-framework.*' -print0 |
+                    while IFS= read -r -d '' line; do
+                        mkdir -p "$(dirname "$MODPATH$line")" && touch "$MODPATH$line"
+                    done
+            fi
+        else
+            ui_print "Skipped cleaning boot-framework files"
         fi
+
         ui_print "Some final touches ..."
         rm -rf "$MODPATH/dex" "$MODPATH/func.sh" "$MODPATH/customize.sh"
         ui_print " "
